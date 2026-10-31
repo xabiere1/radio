@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>라디오</title>
+<style>
+body {
+    max-width: 650px;
+    margin: 40px auto;
+    padding: 20px;
+    font-family: sans-serif;
+    background: #f5f5f5;
+    color: #222;
+}
+h1 { font-size: 24px; }
+#status { display: none !important; }
+#spotify-wrapper, #audio { width: 100%; margin: 15px 0; }
+#spotify-player, #spotify-player iframe { width: 100%; border: 0; border-radius: 12px; }
+#youtube-player, #youtube-player iframe { width: 100%; border: 0; border-radius: 12px; }
+#audio { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
+button { padding: 10px 16px; border: 0; border-radius: 6px; background: #222; color: white; cursor: pointer; }
+button:hover { background: #444; }
+#start { background: #176b36; }
+#playlist { padding-left: 0; list-style: none; }
+#playlist li { padding: 12px; margin: 6px 0; background: white; border-radius: 8px; cursor: pointer; }
+#playlist li.active { background: #d9f5e2; font-weight: bold; }
+#playlist li:hover { background: #e8e8e8; }
+</style>
+</head>
+<body>
+<h1>음악 재생 목록</h1>
+<p id="status">플레이어를 준비하는 중입니다.</p>
+
+<!-- Spotify iframe은 초기화할 때 숨기지 않습니다. 초기화 완료 후 필요에 따라 숨깁니다. -->
+<div id="spotify-wrapper">
+    <div id="spotify-player"></div>
+</div>
+
+<div id="youtube-wrapper" hidden>
+    <div id="youtube-player"></div>
+</div>
+
+<audio id="audio" controls preload="none" hidden></audio>
+
+<div class="controls">
+    <button id="start">재생 시작</button>
+    <button id="prev">이전 곡</button>
+    <button id="next">다음 곡</button>
+</div>
+
+<h2>재생 목록</h2>
+<ul id="playlist"></ul>
+
+<script>
+const tracks = [
+    {
+        type: "audio",
+        title: "외부 오디오 1",
+        url: "https://blog.kakaocdn.net/dna/Cq1qo/dJMcafV023X/AAAAAAAAAAAAAAAAAAAAAJp7cfjbP-J0faYeUTADhL1vAiQtOQGX2Rbkr404NqM0/%EC%A7%B1%EA%B5%AC%EC%98%A4%ED%94%84%EB%8B%9D.m4a?credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1793458799&allow_ip=&allow_referer=&signature=cPcAGA9jQKD1%2BKt4wwmRIfKVCl8%3D&attach=1&knm=tfile.m4a"
+    },
+    {
+        type: "spotify",
+        title: "Spotify 곡 A",
+        url: "https://open.spotify.com/track/3w1YOPx4QhqdQveCfWDGAv"
+    },
+    {
+        type: "audio",
+        title: "외부 오디오 2",
+        url: "https://blog.kakaocdn.net/dna/Cq1qo/dJMcafV023X/AAAAAAAAAAAAAAAAAAAAAJp7cfjbP-J0faYeUTADhL1vAiQtOQGX2Rbkr404NqM0/%EC%A7%B1%EA%B5%AC%EC%98%A4%ED%94%84%EB%8B%9D.m4a?credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1793458799&allow_ip=&allow_referer=&signature=cPcAGA9jQKD1%2BKt4wwmRIfKVCl8%3D&attach=1&knm=tfile.m4a"
+    },
+    {
+        type: "spotify",
+        title: "Spotify 곡 B",
+        url: "https://open.spotify.com/track/3FNutHk4RmvSRp0tT8zj8P"
+    },
+    {
+        type: "youtube",
+        title: "YouTube 예시 영상",
+        url: "https://www.youtube.com/watch?v=jfKfPfyJRdk"
+    }
+];
+
+const status = document.getElementById("status");
+const audio = document.getElementById("audio");
+const playlist = document.getElementById("playlist");
+const spotifyWrapper = document.getElementById("spotify-wrapper");
+const spotifyPlayer = document.getElementById("spotify-player");
+const youtubeWrapper = document.getElementById("youtube-wrapper");
+const startButton = document.getElementById("start");
+
+let controller = null;
+let youtubePlayer = null;
+let youtubeReady = false;
+let spotifyReady = false;
+let currentIndex = 0;
+let lastPosition = 0;
+let lastSpotifyUri = "";
+let switching = false;
+let started = false;
+let isPlaying = false;
+let spotifyApiLoaded = false;
+
+function spotifyUri(url) {
+    const match = url.match(/open\.spotify\.com\/track\/([A-Za-z0-9]+)/);
+    if (!match) throw new Error("잘못된 Spotify URL: " + url);
+    return "spotify:track:" + match[1];
+}
+
+function youtubeVideoId(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.hostname === "youtu.be" || parsed.hostname.endsWith(".youtu.be")) {
+            return parsed.pathname.slice(1).split("/")[0];
+        }
+        if (parsed.hostname.includes("youtube.com")) {
+            if (parsed.pathname === "/watch") return parsed.searchParams.get("v");
+            const match = parsed.pathname.match(/^\/(?:embed|shorts)\/([^/?]+)/);
+            if (match) return match[1];
+        }
+    } catch (error) {}
+    throw new Error("잘못된 YouTube URL: " + url);
+}
+
+function renderList() {
+    playlist.innerHTML = "";
+    tracks.forEach((track, index) => {
+        const li = document.createElement("li");
+        // 목록의 자동 번호는 사용하지 않고, 곡명 앞에 번호를 한 번만 표시합니다.
+        li.textContent =
+            (index + 1) + ". " +
+            (track.type === "spotify" ? "♫ " : track.type === "youtube" ? "▶ " : "♪ ") + track.title;
+        if (index === currentIndex) li.classList.add("active");
+        li.addEventListener("click", () => playTrack(index));
+        playlist.appendChild(li);
+    });
+}
+
+function updatePlayButton(playing) {
+    isPlaying = playing;
+    startButton.textContent = playing ? "일시 정지" : "재생 시작";
+}
+
+function stopCurrentMedia() {
+    updatePlayButton(false);
+    audio.pause();
+    audio.onended = null;
+    audio.onerror = null;
+
+    if (controller && spotifyReady) {
+        try { controller.pause(); }
+        catch (error) { console.warn("Spotify 일시 정지 실패:", error); }
+    }
+    if (youtubePlayer && youtubeReady) {
+        try { youtubePlayer.pauseVideo(); }
+        catch (error) { console.warn("YouTube 일시 정지 실패:", error); }
+    }
+}
+
+function playTrack(index) {
+    if (index < 0 || index >= tracks.length) return;
+    const track = tracks[index];
+
+    if (track.type === "spotify" && (!spotifyReady || !controller)) {
+        status.textContent = "Spotify 플레이어가 아직 준비되지 않았습니다.";
+        return;
+    }
+    if (track.type === "youtube" && (!youtubeReady || !youtubePlayer)) {
+        status.textContent = "YouTube 플레이어가 아직 준비되지 않았습니다.";
+        return;
+    }
+
+    switching = false;
+    stopCurrentMedia();
+    currentIndex = index;
+    lastPosition = 0;
+    renderList();
+
+    if (track.type === "audio") playExternalAudio(track);
+    else if (track.type === "spotify") playSpotify(track);
+    else playYouTube(track);
+}
+
+function playExternalAudio(track) {
+    spotifyWrapper.hidden = true;
+    audio.hidden = false;
+    audio.src = track.url;
+    audio.load();
+
+    status.textContent = "오디오 재생을 시도합니다: " + track.title;
+    audio.onended = nextTrack;
+    audio.onplay = () => updatePlayButton(true);
+    audio.onpause = () => updatePlayButton(false);
+
+    audio.onerror = () => {
+        const code = audio.error ? audio.error.code : "알 수 없음";
+        status.textContent = "오디오 재생 오류 (코드 " + code +
+            "). 파일 URL, 형식 또는 접근 권한을 확인하세요.";
+        console.error("오디오 오류:", audio.error);
+    };
+
+    audio.play().then(() => {
+        status.textContent = "재생 중: " + track.title;
+    }).catch(error => {
+        status.textContent =
+            "자동 재생이 차단되었거나 파일을 재생할 수 없습니다. '재생 시작' 버튼을 누르세요.";
+        console.warn("오디오 재생 실패:", error);
+    });
+}
+
+function playSpotify(track) {
+    audio.pause();
+    audio.hidden = true;
+    youtubeWrapper.hidden = true;
+    spotifyWrapper.hidden = false;
+
+    if (!controller || !spotifyReady) {
+        status.textContent = "Spotify 플레이어가 아직 준비되지 않았습니다.";
+        return;
+    }
+
+    try {
+        const uri = spotifyUri(track.url);
+        lastSpotifyUri = uri;
+        lastPosition = 0;
+        status.textContent = "Spotify 곡을 불러오는 중: " + track.title;
+        controller.loadUri(uri);
+        controller.play();
+    } catch (error) {
+        status.textContent = "Spotify 곡을 불러오지 못했습니다. 플레이어의 재생 버튼을 눌러보세요.";
+        console.error("Spotify 재생 오류:", error);
+    }
+}
+
+function playYouTube(track) {
+    audio.pause();
+    audio.hidden = true;
+    spotifyWrapper.hidden = true;
+    youtubeWrapper.hidden = false;
+
+    if (!youtubePlayer || !youtubeReady) {
+        status.textContent = "YouTube 플레이어가 아직 준비되지 않았습니다.";
+        return;
+    }
+
+    try {
+        const videoId = youtubeVideoId(track.url);
+        status.textContent = "YouTube 영상을 불러오는 중: " + track.title;
+        youtubePlayer.loadVideoById(videoId);
+    } catch (error) {
+        status.textContent = "YouTube 영상을 불러오지 못했습니다. URL을 확인하세요.";
+        console.error("YouTube 재생 오류:", error);
+    }
+}
+
+function nextTrack() {
+    if (switching) return;
+    switching = true;
+
+    if (currentIndex + 1 < tracks.length) {
+        playTrack(currentIndex + 1);
+    } else {
+        stopCurrentMedia();
+        spotifyWrapper.hidden = true;
+        youtubeWrapper.hidden = true;
+        audio.hidden = true;
+        status.textContent = "재생 목록이 끝났습니다.";
+        switching = false;
+    }
+}
+
+function prevTrack() {
+    if (currentIndex > 0) playTrack(currentIndex - 1);
+}
+
+document.getElementById("next").addEventListener("click", nextTrack);
+document.getElementById("prev").addEventListener("click", prevTrack);
+
+startButton.addEventListener("click", () => {
+    // 재생 중이면 일시 정지, 정지/일시 정지 상태면 이어서 재생합니다.
+    if (isPlaying) {
+        if (tracks[currentIndex].type === "audio") {
+            audio.pause();
+        } else if (tracks[currentIndex].type === "spotify" && controller && spotifyReady) {
+            controller.pause();
+            updatePlayButton(false);
+        } else if (tracks[currentIndex].type === "youtube" && youtubePlayer && youtubeReady) {
+            youtubePlayer.pauseVideo();
+            updatePlayButton(false);
+        }
+        return;
+    }
+
+    if (!started) {
+        if (tracks[0].type === "spotify" && (!spotifyReady || !controller)) {
+            return;
+        }
+        started = true;
+        playTrack(0);
+        return;
+    }
+
+    const track = tracks[currentIndex];
+    if (track.type === "audio") {
+        audio.play().catch(error => {
+            updatePlayButton(false);
+            console.warn("오디오 재생 실패:", error);
+        });
+    } else if (track.type === "spotify" && controller && spotifyReady) {
+        controller.play();
+    } else if (track.type === "youtube" && youtubePlayer && youtubeReady) {
+        youtubePlayer.playVideo();
+    }
+});
+
+renderList();
+
+/* YouTube IFrame Player API 초기화 */
+window.onYouTubeIframeAPIReady = () => {
+    youtubePlayer = new YT.Player("youtube-player", {
+        width: "100%",
+        height: "220",
+        videoId: youtubeVideoId(tracks.find(track => track.type === "youtube").url),
+        // YouTube IFrame API는 HTTP/HTTPS 출처를 식별할 수 있어야 합니다.
+        // file:// 로 직접 열면 origin이 null이므로 로컬 웹서버 또는 웹호스팅에서 실행해야 합니다.
+        playerVars: {
+            playsinline: 1,
+            rel: 0,
+            enablejsapi: 1,
+            ...(window.location.protocol === "http:" || window.location.protocol === "https:"
+                ? { origin: window.location.origin }
+                : {})
+        },
+        events: {
+            onReady: () => {
+                youtubeReady = true;
+                // 브라우저가 보낼 수 있는 출처 정보를 명시합니다.
+                try {
+                    youtubePlayer.getIframe().setAttribute(
+                        "referrerpolicy", "strict-origin-when-cross-origin"
+                    );
+                } catch (error) {}
+                // 준비용 영상은 자동 재생하지 않습니다.
+                youtubePlayer.stopVideo();
+                if (window.location.protocol === "file:") {
+                    console.warn("YouTube는 file://에서 플레이어 설정 오류가 날 수 있습니다. HTTP/HTTPS 서버에서 페이지를 여세요.");
+                }
+            },
+            onStateChange: (event) => {
+                if (tracks[currentIndex]?.type !== "youtube") return;
+                if (event.data === YT.PlayerState.PLAYING) updatePlayButton(true);
+                else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.CUED) updatePlayButton(false);
+                if (event.data === YT.PlayerState.ENDED && !switching) nextTrack();
+            },
+            onError: (event) => {
+                const messages = {
+                    2: "YouTube URL 또는 영상 ID가 올바르지 않습니다.",
+                    5: "브라우저의 HTML5 플레이어에서 영상을 재생할 수 없습니다.",
+                    100: "영상을 찾을 수 없거나 비공개 영상입니다.",
+                    101: "영상 소유자가 외부 사이트 재생을 허용하지 않았습니다.",
+                    150: "영상 소유자가 외부 사이트 재생을 허용하지 않았습니다.",
+                    153: "YouTube가 페이지 출처(Referer)를 확인하지 못했습니다. HTML 파일을 file://로 열지 말고 HTTP/HTTPS 웹서버에서 실행하세요."
+                };
+                status.textContent = messages[event.data] || ("YouTube 재생 오류 (코드 " + event.data + ").");
+                updatePlayButton(false);
+                console.warn("YouTube 재생 오류 코드:", event.data);
+            }
+        }
+    });
+};
+
+const youtubeScript = document.createElement("script");
+youtubeScript.src = "https://www.youtube.com/iframe_api";
+youtubeScript.async = true;
+youtubeScript.onerror = () => {
+    status.textContent = "YouTube API를 불러오지 못했습니다.";
+};
+document.head.appendChild(youtubeScript);
+
+/*
+ * 반드시 API 스크립트를 불러오기 전에 콜백을 정의합니다.
+ * 컨트롤러를 처음 생성할 때 Spotify 영역은 숨겨져 있지 않습니다.
+ */
+window.onSpotifyIframeApiReady = (IFrameAPI) => {
+    const firstSpotify = tracks.find(track => track.type === "spotify");
+
+    if (!firstSpotify) {
+        spotifyReady = true;
+        started = true;
+        playTrack(0);
+        return;
+    }
+
+    IFrameAPI.createController(
+        spotifyPlayer,
+        {
+            width: "100%",
+            height: 152,
+            uri: spotifyUri(firstSpotify.url)
+        },
+        (embedController) => {
+            controller = embedController;
+
+            controller.addListener("ready", () => {
+                spotifyReady = true;
+                status.textContent = "플레이어 준비 완료. 첫 곡 재생을 시작합니다.";
+
+                if (!started) {
+                    started = true;
+                    playTrack(0);
+                }
+            });
+
+            controller.addListener("playback_update", (event) => {
+                const data = event.data || {};
+                if (tracks[currentIndex].type !== "spotify") return;
+                if (data.playingURI !== lastSpotifyUri) return;
+                updatePlayButton(!data.isPaused);
+
+                if (
+                    !data.isPaused &&
+                    !data.isBuffering &&
+                    data.duration > 0 &&
+                    data.position >= data.duration - 1200 &&
+                    lastPosition < data.duration - 1200 &&
+                    !switching
+                ) {
+                    nextTrack();
+                }
+
+                lastPosition = data.position || 0;
+            });
+        }
+    );
+};
+
+const spotifyScript = document.createElement("script");
+spotifyScript.src = "https://open.spotify.com/embed/iframe-api/v1";
+spotifyScript.async = true;
+spotifyScript.onerror = () => {
+    status.textContent = "Spotify API를 불러오지 못했습니다. 네트워크나 차단 설정을 확인하세요.";
+};
+document.body.appendChild(spotifyScript);
+</script>
+</body>
+</html>
