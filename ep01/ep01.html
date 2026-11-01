@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f5f5">
+<title>라디오</title>
+
+<style>
+/* 기본 설정 */
+* {
+    box-sizing: border-box;
+}
+
+html {
+    width: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    width: 100%;
+    max-width: 690px;
+    margin: 0 auto;
+    padding: 0px 20px;
+    font-family: Arial, "Malgun Gothic", sans-serif;
+    background: #f5f5f5;
+    color: #222;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+h1 {
+    margin: 0 0 20px;
+    font-size: 24px;
+    line-height: 1.4;
+}
+
+h2 {
+    margin: 28px 0 12px;
+    font-size: 20px;
+}
+
+#status {
+    display: none !important;
+}
+
+/* 앨범 이미지 */
+#audio-artwork-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    margin: 10px 0 0;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #e5e5e5;
+    line-height: normal;
+}
+
+#audio-artwork {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+/* 트랙 제목 오버레이 */
+#track-title-overlay {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    display: block;
+    padding: 30px 16px 14px;
+
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    line-height: 1.4;
+
+    overflow-wrap: anywhere;
+
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.85),
+        rgba(0, 0, 0, 0)
+    );
+
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+}
+
+/* 오디오 플레이어 */
+#audio,
+#audio-next {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0px 0;
+}
+
+#audio[hidden],
+#audio-next[hidden] {
+    display: none !important;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* 재생 버튼 */
+.controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+}
+
+button {
+    min-height: 34px;
+    padding: 0px 0px;
+    border: 0;
+    border-radius: 4px;
+    background: #222;
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:hover {
+    background: #444;
+}
+
+button:focus-visible,
+#playlist li:focus-visible {
+    outline: 3px solid #4388ff;
+    outline-offset: 2px;
+}
+
+#start {
+    background: #176b36;
+}
+
+#start:hover {
+    background: #218548;
+}
+
+/* 재생목록 토글 버튼 */
+#playlist-toggle {
+    width: 100%;
+    margin-top: 10px;
+    min-height: 38px;
+    background: #333;
+    font-weight: bold;
+}
+
+#playlist-toggle:hover {
+    background: #555;
+}
+
+/* 재생 목록 */
+#playlist {
+    width: 100%;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+#playlist li {
+    min-width: 0;
+    padding: 5px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 0px;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+    transition: background-color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#playlist li.active {
+    background: #d9f5e2;
+    font-weight: bold;
+    box-shadow: inset 3px 0 #176b36;
+}
+
+#playlist li:hover {
+    background: #e8e8e8;
+}
+
+/* 태블릿 및 작은 화면 */
+@media (max-width: 600px) {
+    body {
+        padding: 22px 16px;
+    }
+
+    h1 {
+        font-size: 22px;
+    }
+
+    h2 {
+        font-size: 19px;
+        margin-top: 24px;
+    }
+
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 2px;
+    }
+
+    .controls button {
+        width: 100%;
+        min-width: 0;
+        padding: 10px 4px;
+        font-size: 14px;
+    }
+
+    #playlist li {
+        padding: 5px;
+    }
+
+    #track-title-overlay {
+        padding: 24px 12px 10px;
+        font-size: 17px;
+    }
+}
+
+/* 스마트폰 */
+@media (max-width: 380px) {
+    body {
+        padding: 16px 12px;
+    }
+
+    h1 {
+        font-size: 21px;
+    }
+
+    .controls {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+
+    .controls button {
+        min-height: 34px;
+        font-size: 15px;
+    }
+
+    #audio-artwork-wrapper {
+        border-radius: 5px;
+    }
+    #track-title-overlay {
+        font-size: 15px;
+    }
+}
+
+/* 모션 최소화 설정 존중 */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<h1>    </h1>
+
+<p id="status" role="status" aria-live="polite">
+    플레이어를 준비하는 중입니다.
+</p>
+
+<!-- 곡별 이미지 -->
+<div id="audio-artwork-wrapper" hidden>
+    <img
+        id="audio-artwork"
+        alt="현재 재생 중인 오디오 이미지"
+    >
+    <div id="track-title-overlay"></div>
+</div>
+
+<!-- 오디오 플레이어 -->
+<audio id="audio" controls preload="auto" hidden></audio>
+<audio id="audio-next" preload="auto" hidden></audio>
+
+<!-- 재생 컨트롤 -->
+<div class="controls">
+    <button id="start" type="button">▶</button>
+    <button id="prev" type="button">≪</button>
+    <button id="next" type="button">≫</button>
+</div>
+
+<!-- 재생목록 열기/닫기 버튼 및 목록 (기본 닫힘 상태) -->
+<button id="playlist-toggle" type="button">재생목록 열기 ▾</button>
+<ul id="playlist" hidden></ul>
+
+<script>
+const tracks = [
+    {
+        title: "휴대폰",
+        image: "https://mblogthumb-phinf.pstatic.net/MjAyMzAyMThfNzYg/MDAxNjc2NzA4OTQ4ODAx.aA0Wx-5ez09jYesp8DHtcSM3JaW6PKPfyGm1JFwttGAg.mCEqhdBBwRLilw8t6XUECWYL_f0q-nhRTMrOuZm7dsYg.PNG.idw103/SE-f56b9d55-b74d-4579-9d61-e7a2cf167b10.png?type=w800",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/takecaremycat_0.mp3"
+    },
+    {
+        title: "모임 별 / 진정한 후렌치후라이의 시대는 갔는가",
+        image: "https://image.bugsm.co.kr/album/images/1200/3126/312689.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/0_Realfrenchfried.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-1.m4a"
+    },
+    {
+        title: "Vanessa Carlton / A Thousand Miles",
+        image: "https://upload.wikimedia.org/wikipedia/en/f/fd/A_Thousand_Miles.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/vanessa-carlton-a-thousand-miles.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-2.m4a"
+    },
+    {
+        title: "パ・ランマウム / 終わらない歌",
+        image: "https://www.bitters.co.jp/linda4k/assets/img/mid/mv_img.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/Paranmaum.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-3.m4a"
+    },
+    {
+        title: "장필순 / 동창",
+        image: "https://ksoundlab.com/xe/files/attach/images/28216/208/063/0bcccee40a8292f4afc88ec89ab3a591.JPG",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/pilsoon.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-4.m4a"
+    },
+    {
+        title: "Sarah McLachlan / Blackbird",
+        image: "https://image.bugsm.co.kr/album/images/1200/80127/8012717.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/blackbird.mp3"
+    },
+    {
+        title: "Ben Folds / Golden Slumbers",
+        image: "https://image.bugsm.co.kr/album/images/1200/80127/8012717.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/Golden Slumber.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-5.m4a"
+    },
+    {
+        title: "Laugh & Peace / Polaroid",
+        image: "https://m.media-amazon.com/images/M/MV5BZjM4YjAzZTUtOTdjNC00MDFmLThmMGUtYmQ1YjcyOWI0NmNlXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/Polaroid.mp3"
+    },
+    {
+        title: "사연 소개",
+        image: "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/1-6.m4a"
+    },
+    {
+        title: "나는 네가",
+        image: "https://www.artinsight.co.kr/data/tmp/1907/e8e50dbed8143504b618be85eef74aa4_564oaZuMGLQZe.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/takecaremycat_6.mp3"
+    },
+    {
+        title: "모임 별 / 푸른전구빛",
+        image: "https://image.bugsm.co.kr/album/images/1200/3126/312689.jpg",
+        url: "https://github.com/xabiere1/radio/raw/refs/heads/main/ep01/0_bluelight.mp3"
+    }
+];
+
+// 재생 종료 시 표시할 별도 이미지 주소 설정
+const END_IMAGE = "https://raw.githubusercontent.com/xabiere1/radio/refs/heads/main/ww.gif";
+
+const CROSSFADE_TRACKS = [0,14];
+const CROSSFADE_DURATION = 5;
+const FADE_INTERVAL = 50;
+
+const status = document.getElementById("status");
+const audioA = document.getElementById("audio");
+const audioB = document.getElementById("audio-next");
+
+const audioArtworkWrapper = document.getElementById("audio-artwork-wrapper");
+const audioArtwork = document.getElementById("audio-artwork");
+const trackTitleOverlay = document.getElementById("track-title-overlay");
+const playlist = document.getElementById("playlist");
+const startButton = document.getElementById("start");
+const playlistToggle = document.getElementById("playlist-toggle");
+
+let activeAudio = audioA;
+let standbyAudio = audioB;
+
+let currentIndex = 0;
+let started = false;
+let isPlaying = false;
+
+let crossfading = false;
+let fadeTimer = null;
+let monitorTimer = null;
+
+let trackGeneration = 0;
+
+/* 재생목록 열기/닫기 토글 이벤트 */
+playlistToggle.addEventListener("click", () => {
+    const isHidden = playlist.hasAttribute("hidden");
+    if (isHidden) {
+        playlist.removeAttribute("hidden");
+        playlistToggle.textContent = "재생목록 닫기 ▴";
+    } else {
+        playlist.setAttribute("hidden", "");
+        playlistToggle.textContent = "재생목록 열기 ▾";
+    }
+});
+
+function updatePlayButton(playing) {
+    isPlaying = playing;
+    startButton.textContent = playing ? "❚❚" : "▶";
+}
+
+function renderList() {
+    playlist.innerHTML = "";
+
+    tracks.forEach((track, index) => {
+        const li = document.createElement("li");
+
+        li.textContent = `${index + 1}. ${track.title}`;
+        li.tabIndex = 0;
+        li.setAttribute("role", "button");
+
+        li.setAttribute(
+            "aria-current",
+            index === currentIndex ? "true" : "false"
+        );
+
+        if (index === currentIndex) {
+            li.classList.add("active");
+        }
+
+        li.addEventListener("click", () => playTrack(index));
+
+        li.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                playTrack(index);
+            }
+        });
+
+        playlist.appendChild(li);
+    });
+}
+
+function clearFadeTimer() {
+    if (fadeTimer !== null) {
+        clearInterval(fadeTimer);
+        fadeTimer = null;
+    }
+}
+
+function clearMonitorTimer() {
+    if (monitorTimer !== null) {
+        clearInterval(monitorTimer);
+        monitorTimer = null;
+    }
+}
+
+function stopAllAudio() {
+    clearFadeTimer();
+    clearMonitorTimer();
+
+    trackGeneration++;
+    crossfading = false;
+
+    [audioA, audioB].forEach(audio => {
+        audio.pause();
+        audio.onended = null;
+        audio.onerror = null;
+        audio.ontimeupdate = null;
+        audio.removeAttribute("src");
+        audio.load();
+        audio.volume = 1;
+    });
+
+    activeAudio = audioA;
+    standbyAudio = audioB;
+
+    audioA.controls = true;
+    audioA.hidden = false;
+
+    audioB.controls = false;
+    audioB.hidden = true;
+
+    updatePlayButton(false);
+}
+
+function updateArtwork(index) {
+    const track = tracks[index];
+
+    audioArtworkWrapper.hidden = false;
+    audioArtwork.src = track.image;
+    audioArtwork.alt = track.title + " 이미지";
+    trackTitleOverlay.textContent = track.title;
+}
+
+function configureActiveAudio() {
+    const generation = trackGeneration;
+
+    activeAudio.onended = () => {
+        if (generation !== trackGeneration || crossfading) {
+            return;
+        }
+        nextTrack();
+    };
+
+    activeAudio.onerror = () => {
+        if (generation !== trackGeneration) return;
+
+        const code = activeAudio.error
+            ? activeAudio.error.code
+            : "알 수 없음";
+
+        status.textContent =
+            "오디오 재생 오류 (코드 " + code +
+            "). 파일 주소, 만료 여부 또는 접근 권한을 확인하세요.";
+
+        console.error(status.textContent);
+    };
+
+    activeAudio.onplay = () => {
+        if (generation !== trackGeneration) return;
+
+        updatePlayButton(true);
+        status.textContent = "";
+    };
+
+    activeAudio.onpause = () => {
+        if (generation !== trackGeneration) return;
+
+        updatePlayButton(false);
+    };
+}
+
+function playTrack(index) {
+    if (index < 0 || index >= tracks.length) return;
+
+    stopAllAudio();
+
+    currentIndex = index;
+    started = true;
+
+    renderList();
+    updateArtwork(index);
+
+    const track = tracks[index];
+
+    activeAudio.src = track.url;
+    activeAudio.volume = 1;
+
+    activeAudio.controls = true;
+    activeAudio.hidden = false;
+
+    standbyAudio.controls = false;
+    standbyAudio.hidden = true;
+
+    activeAudio.load();
+
+    configureActiveAudio();
+
+    const generation = trackGeneration;
+
+    activeAudio.play().then(() => {
+        if (generation !== trackGeneration) return;
+
+        updatePlayButton(true);
+        status.textContent = "";
+
+        startMonitor();
+    }).catch(error => {
+        if (generation !== trackGeneration) return;
+
+        updatePlayButton(false);
+
+        status.textContent =
+            error.name === "NotAllowedError"
+                ? "자동 재생이 차단되었습니다. 재생 시작 버튼을 눌러주세요."
+                : "재생 실패: " + error.name +
+                  ". 파일 주소와 접근 권한을 확인하세요.";
+
+        console.warn("재생 실패:", error);
+    });
+}
+
+function startMonitor() {
+    clearMonitorTimer();
+
+    monitorTimer = setInterval(() => {
+        if (crossfading || activeAudio.paused) return;
+
+        if (!CROSSFADE_TRACKS.includes(currentIndex)) return;
+
+        const duration = activeAudio.duration;
+
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
+        const remaining = duration - activeAudio.currentTime;
+
+        if (remaining <= CROSSFADE_DURATION && remaining > 0) {
+            beginCrossfade();
+        }
+    }, 100);
+}
+
+function beginCrossfade() {
+    if (crossfading) return;
+
+    const nextIndex = currentIndex + 1;
+
+    if (nextIndex >= tracks.length) return;
+
+    crossfading = true;
+
+    clearMonitorTimer();
+
+    const generation = trackGeneration;
+    const outgoing = activeAudio;
+    const incoming = standbyAudio;
+
+    incoming.pause();
+    incoming.onended = null;
+    incoming.onerror = null;
+
+    incoming.src = tracks[nextIndex].url;
+    incoming.volume = 0;
+    incoming.load();
+
+    incoming.onended = () => {
+        if (generation !== trackGeneration || crossfading) return;
+
+        nextTrack();
+    };
+
+    incoming.onerror = () => {
+        if (generation !== trackGeneration) return;
+
+        console.error("다음 트랙을 불러오지 못했습니다.");
+
+        clearFadeTimer();
+
+        incoming.pause();
+        incoming.removeAttribute("src");
+        incoming.load();
+
+        outgoing.volume = 1;
+        crossfading = false;
+
+        startMonitor();
+    };
+
+    incoming.play().then(() => {
+        if (generation !== trackGeneration) {
+            incoming.pause();
+            return;
+        }
+
+        const startTime = performance.now();
+
+        clearFadeTimer();
+
+        fadeTimer = setInterval(() => {
+            if (generation !== trackGeneration) {
+                clearFadeTimer();
+                return;
+            }
+
+            const elapsed = (performance.now() - startTime) / 1000;
+            const progress = Math.min(
+                elapsed / CROSSFADE_DURATION,
+                1
+            );
+
+            outgoing.volume = Math.max(0, 1 - progress);
+            incoming.volume = Math.min(1, progress);
+
+            if (progress >= 1) {
+                finishCrossfade(
+                    outgoing,
+                    incoming,
+                    nextIndex,
+                    generation
+                );
+            }
+        }, FADE_INTERVAL);
+
+    }).catch(error => {
+        if (generation !== trackGeneration) return;
+
+        console.warn("크로스페이드 실패:", error);
+
+        incoming.pause();
+        incoming.removeAttribute("src");
+        incoming.load();
+
+        outgoing.volume = 1;
+        crossfading = false;
+
+        startMonitor();
+    });
+}
+
+function finishCrossfade(
+    outgoing,
+    incoming,
+    nextIndex,
+    generation
+) {
+    clearFadeTimer();
+
+    if (generation !== trackGeneration) return;
+
+    outgoing.pause();
+    outgoing.volume = 1;
+
+    outgoing.onended = null;
+    outgoing.onerror = null;
+    outgoing.ontimeupdate = null;
+
+    activeAudio = incoming;
+    standbyAudio = outgoing;
+
+    currentIndex = nextIndex;
+    crossfading = false;
+
+    standbyAudio.controls = false;
+    standbyAudio.hidden = true;
+
+    activeAudio.controls = true;
+    activeAudio.hidden = false;
+    activeAudio.volume = 1;
+
+    renderList();
+    updateArtwork(currentIndex);
+    configureActiveAudio();
+    updatePlayButton(!activeAudio.paused);
+
+    startMonitor();
+}
+
+function nextTrack() {
+    if (currentIndex + 1 < tracks.length) {
+        playTrack(currentIndex + 1);
+    } else {
+        clearFadeTimer();
+        clearMonitorTimer();
+
+        trackGeneration++;
+        crossfading = false;
+
+        [audioA, audioB].forEach(audio => {
+            audio.pause();
+            audio.onended = null;
+            audio.onerror = null;
+            audio.ontimeupdate = null;
+            audio.removeAttribute("src");
+            audio.load();
+            audio.volume = 1;
+        });
+
+        activeAudio = audioA;
+        standbyAudio = audioB;
+
+        // 플레이어를 숨기지 않고 유지
+        audioA.controls = true;
+        audioA.hidden = false;
+        audioB.controls = false;
+        audioB.hidden = true;
+
+        // 종료 이미지와 텍스트 설정
+        audioArtworkWrapper.hidden = false;
+        audioArtwork.src = END_IMAGE;
+        audioArtwork.alt = "재생 종료 이미지";
+        trackTitleOverlay.textContent = "재생이 종료되었습니다.";
+
+        updatePlayButton(false);
+        status.textContent = "재생 목록이 끝났습니다.";
+    }
+}
+
+function prevTrack() {
+    if (currentIndex > 0) {
+        playTrack(currentIndex - 1);
+    }
+}
+
+document.getElementById("next").addEventListener("click", nextTrack);
+document.getElementById("prev").addEventListener("click", prevTrack);
+
+startButton.addEventListener("click", () => {
+    if (isPlaying) {
+        activeAudio.pause();
+
+        if (crossfading) {
+            standbyAudio.pause();
+            clearFadeTimer();
+            clearMonitorTimer();
+
+            crossfading = false;
+
+            activeAudio.volume = 1;
+
+            standbyAudio.removeAttribute("src");
+            standbyAudio.load();
+        }
+
+        return;
+    }
+
+    if (!started) {
+        playTrack(0);
+        return;
+    }
+
+    activeAudio.play().then(() => {
+        updatePlayButton(true);
+        startMonitor();
+    }).catch(error => {
+        status.textContent =
+            "재생할 수 없습니다. 파일 주소와 접근 권한을 확인하세요.";
+
+        console.warn(error);
+    });
+});
+
+renderList();
+playTrack(0);
+</script>
+
+</body>
+</html>
