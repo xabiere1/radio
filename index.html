@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>꾸디오</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bar-bg: #172033;
+      --button-bg: #8a9ed1;
+      --button-hover: #96abe0;
+      --active-bg: #a5baf0;
+      --active-text: #172033;
+    }
+
+    html, body { width: 100%; height: 100%; margin: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f4f6fa;
+      overflow: hidden;
+    }
+
+    .topbar {
+      flex: 0 0 auto;
+      padding: 0;
+      background: var(--bar-bg);
+    }
+
+    .menu {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 0;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .menu-button {
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: none;
+      padding: 11px 16px;
+      border: 0;
+      border-radius: 0;
+      color: #fff;
+      background: var(--button-bg);
+      font: inherit;
+      font-size: .95rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      cursor: pointer;
+      transition: background-color .15s ease, color .15s ease;
+    }
+
+    .menu-button:hover { background: var(--button-hover); }
+
+    .menu-button.active {
+      color: var(--active-text);
+      background: var(--active-bg);
+      font-weight: 700;
+    }
+
+    .viewer {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      background: #fff;
+    }
+
+    #pageFrame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
+    }
+
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      color: #536078;
+      background: #f4f6fa;
+    }
+
+    .empty-state.hidden { display: none; }
+
+    .empty-icon {
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      color: #2459c4;
+      background: #e1eaff;
+      font-size: 1.8rem;
+    }
+
+    .empty-state h1 {
+      margin: 16px 0 8px;
+      color: #172033;
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+    }
+
+    .empty-state p {
+      max-width: 560px;
+      margin: 5px 0;
+      line-height: 1.6;
+    }
+
+    .empty-state .note {
+      margin-top: 18px;
+      color: #737f93;
+      font-size: .85rem;
+    }
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 0;
+  }
+
+  .menu {
+    gap: 0;
+  }
+
+  .menu-button {
+    min-width: 0;
+    padding: 9px 11px;
+    font-size: .88rem;
+  }
+}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav id="menu" class="menu" aria-label="웹페이지 메뉴">
+      <!-- 메뉴를 추가하려면 아래 예시처럼 menu-button 요소를 복사해 수정하세요. -->
+      <button class="menu-button" type="button" data-url="https://xabiere1.github.io/radio/ep01/ep01.html">1화</button>
+      <!--
+      <button class="menu-button" type="button" data-url="https://www.wikipedia.org/">위키백과</button>
+      <button class="menu-button" type="button" data-url="https://www.google.com/">검색</button>
+      -->
+    </nav>
+  </header>
+
+  <main class="viewer">
+    <iframe id="pageFrame" title="선택한 웹페이지" src="about:blank"
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">⬆</div>
+      <h1>1화가 공개되었습니다!</h1>
+      <p></p>
+      <p class="note"></p>
+    </div>
+  </main>
+
+  <script>
+    const menu = document.getElementById("menu");
+    const pageFrame = document.getElementById("pageFrame");
+    const emptyState = document.getElementById("emptyState");
+
+    menu.querySelectorAll(".menu-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const url = button.dataset.url;
+
+        if (!url) {
+          alert("이 메뉴의 data-url에 웹페이지 주소를 입력하세요.");
+          return;
+        }
+
+        menu.querySelectorAll(".menu-button").forEach((item) => {
+          item.classList.remove("active");
+          item.setAttribute("aria-current", "false");
+        });
+
+        button.classList.add("active");
+        button.setAttribute("aria-current", "page");
+        pageFrame.src = url;
+        emptyState.classList.add("hidden");
+      });
+    });
+  </script>
+</body>
+</html>
